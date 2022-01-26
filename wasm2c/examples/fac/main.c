@@ -14,17 +14,24 @@ int main(int argc, char** argv) {
   /* Initialize the Wasm runtime. */
   wasm_rt_init();
 
-  /* Initialize the fac module. */
-  Z_fac_init();
+  /* Initialize the `fac` module (this registers the module's function types in
+   * a global data structure) */
+  Z_fac_init_module();
+
+  /* Declare an instance of the `fac` module. */
+  Z_fac_module_instance_t module_instance;
+
+  /* Construct the module instance. */
+  Z_fac_instantiate(&module_instance);
 
   /* Call `fac`, using the mangled name. */
-  u32 result = Z_facZ_fac(x);
+  u32 result = Z_facZ_fac(&module_instance, x);
 
   /* Print the result. */
   printf("fac(%u) -> %u\n", x, result);
 
   /* Free the fac module. */
-  Z_fac_free();
+  Z_fac_free(&module_instance);
 
   /* Free the Wasm runtime state. */
   wasm_rt_free();
