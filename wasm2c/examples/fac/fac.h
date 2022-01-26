@@ -25,11 +25,16 @@ typedef double f64;
 extern "C" {
 #endif
 
-extern void Z_fac_init(void);
-extern void Z_fac_free(void);
+typedef struct Z_fac_module_instance_t {
+  char dummy_member;
+} Z_fac_module_instance_t;
+
+extern void Z_fac_init_module(void);
+extern void Z_fac_init(Z_fac_module_instance_t*);
+extern void Z_fac_free(Z_fac_module_instance_t*);
 
 /* export: 'fac' */
-extern u32 (*Z_facZ_fac)(u32);
+extern u32 Z_facZ_fac(Z_fac_module_instance_t*, u32);
 
 #ifdef __cplusplus
 }

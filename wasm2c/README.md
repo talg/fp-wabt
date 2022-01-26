@@ -16,6 +16,7 @@ $ wasm2c test.wasm --no-debug-names -o test.c
 Let's look at a simple example of a factorial function.
 
 ```wasm
+(memory $mem 1)
 (func (export "fac") (param $x i32) (result i32)
   (if (result i32) (i32.eq (local.get $x) (i32.const 0))
     (then (i32.const 1))
@@ -49,12 +50,17 @@ To actually use our `fac` module, we'll use create a new file, `main.c`, that
 include `fac.h`, initializes the module, and calls `fac`.
 
 `wasm2c` generates a few C symbols based on the `fac.wasm` module.  `Z_fac_init`
-and `Z_fac_Z_fac`.  The former initializes the module, and the later is our
+and `Z_facZ_fac`.  The former initializes the module, and the latter is our
 exported `fac` function.
 
 All the exported symbols shared a common prefix (`Z_fac`) which, by default, is
 based on the name section in the module or the name of input file.  This prefix
 can be overridden using the `-n/--module-name` command line flag.
+
+In addition to parameters defined in `fac.wat`, `init` and `Z_facZ_fac` also
+take in a pointer to a `Z_fac_module_instance_t`.  The structure is used to
+store the context information of the module instance, and `main.c` is responsible
+for providing it.
 
 ```c
 #include <stdio.h>
@@ -64,7 +70,8 @@ can be overridden using the `-n/--module-name` command line flag.
 
 int main(int argc, char** argv) {
   /* Make sure there is at least one command-line argument. */
-  if (argc < 2) return 1;
+  if (argc < 2)
+    return 1;
 
   /* Convert the argument from a string to an int. We'll implicitly cast the int
   to a `u32`, which is what `fac` expects. */
@@ -73,23 +80,31 @@ int main(int argc, char** argv) {
   /* Initialize the Wasm runtime. */
   wasm_rt_init();
 
-  /* Initialize the fac module. */
-  Z_fac_init();
+  /* Initialize the `fac` module (this registers the module's function types in
+   * a global data structure) */
+  Z_fac_init_module();
+
+  /* Declare an instance of the `fac` module. */
+  Z_fac_module_instance_t module_instance;
+
+  /* Initialize the module instance. */
+  Z_fac_init(&module_instance);
 
   /* Call `fac`, using the mangled name. */
-  u32 result = Z_facZ_fac(x);
+  u32 result = Z_facZ_fac(&module_instance, x);
 
   /* Print the result. */
   printf("fac(%u) -> %u\n", x, result);
 
   /* Free the fac module. */
-  Z_fac_free();
+  Z_fac_free(&module_instance);
 
   /* Free the Wasm runtime state. */
   wasm_rt_free();
 
   return 0;
 }
+
 ```
 
 To compile the executable, we need to use `main.c` and the generated `fac.c`.
@@ -127,27 +142,34 @@ The generated header file looks something like this:
 #include "wasm-rt.h"
 
 ...
-
 #ifndef WASM_RT_CORE_TYPES_DEFINED
 #define WASM_RT_CORE_TYPES_DEFINED
+
 ...
+
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern void Z_fac_init(void);
-extern void Z_fac_free(void);
+typedef struct Z_fac_module_instance_t {
+  char dummy_member;
+} Z_fac_module_instance_t;
+
+extern void Z_fac_init_module(void);
+extern void Z_fac_init(Z_fac_module_instance_t*);
+extern void Z_fac_free(Z_fac_module_instance_t*);
 
 /* export: 'fac' */
-extern u32 (*Z_facZ_fac)(u32);
+extern u32 Z_facZ_fac(Z_fac_module_instance_t*, u32);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif  /* FAC_H_GENERATED_ */
+
 ```
 
 Let's look at each section. The outer `#ifndef` is standard C
@@ -194,12 +216,15 @@ typedef void (*wasm_rt_funcref_t)(void);
 ```
 
 Next are the definitions for a table element. `func_type` is a function index
-as returned by `wasm_rt_register_func_type` described below.
+as returned by `wasm_rt_register_func_type` described below. `module_instance`
+is the pointer to the module instance taht should be passed in when the func is
+called.
 
 ```c
 typedef struct {
   uint32_t func_type;
   wasm_rt_funcref_t func;
+  void* module_instance;
 } wasm_rt_elem_t;
 ```
 
@@ -287,25 +312,60 @@ It is only used on platforms that don't use the signal handler to detect
 exhaustion.
 
 ## Exported symbols
+Finally, `fac.h` defines the module instance type (which in the case
+of `fac` is essentially empty), and the exported symbols provided by
+the module. In our example, the only function we exported was
+`fac`. `Z_fac_init_module()` initializes the whole module and must be
+called before any instance of the module is used.
 
-Finally, `fac.h` defines exported symbols provided by the module. In our
-example, the only function we exported was `fac`. Two additional
-functions are provided called `init`, which initializes the module and
-must be called before the module can be used, and `free`, which frees
-the module's state (its memory and table instances).
+`Z_fac_init(Z_fac_module_instance_t*)` initializes an instance of
+the module and must be called before the module instance can be
+used. `Z_fac_free(Z_fac_module_instance_t*)` frees the instance.
 
 ```c
-extern void Z_fac_init(void);
-extern void Z_fac_free(void);
+typedef struct Z_fac_module_instance_t {
+  char dummy_member;
+} Z_fac_module_instance_t;
+
+extern void Z_fac_init_module(void);
+extern void Z_fac_init(Z_fac_module_instance_t*);
+extern void Z_fac_free(Z_fac_module_instance_t*);
 
 /* export: 'fac' */
-extern u32 (*Z_facZ_fac)(u32);
+extern u32 Z_facZ_fac(Z_fac_module_instance_t*, u32);
 ```
 
-All exported names use the mangled module name as a prefix (as described above)
-to avoid collisions with other C symbols or symbols from other modules.
+## Handling other kinds of imports and exports of modules
+Exported functions are handled by declaring a prefixed equivalent
+function in the header. If a module is imports a function, `wasm2c`
+declares the function in the output header file, and the host function
+is responsible for defining the function.
 
-In our example, `Z_facZ_fac` is the mangling of the function named `fac`.
+Exports of other kinds (globals, memories, tables) are handled
+differently, since they are part of the module instance, and each
+instance can have its own exports. For these cases, `wasm2c` provides
+a function that takes in a module instance as argument, and returns
+the corresponding export. For example, if `fac` exported a memory as
+such:
+
+```wasm
+(export "mem" (memory $mem))
+```
+
+then `wasm2c` would declare the following function in the header:
+
+```c
+/* export: 'mem' */
+extern wasm_rt_memory_t* Z_facZ_mem(Z_fac_module_instance_t*);
+```
+
+which would be defined as:
+```c
+/* export: 'mem' */
+wasm_rt_memory_t* Z_fac_Z_mem(Z_fac_module_instance_t* module_instance) {
+  return &module_instance->w2c_M0;
+}
+```
 
 ## A quick look at `fac.c`
 
@@ -324,7 +384,7 @@ module doesn't use any globals, memory or tables.
 The most interesting part is the definition of the function `fac`:
 
 ```c
-static u32 w2c_fac(u32 w2c_p0) {
+static u32 w2c_fac(Z_fac_module_instance_t* module_instance, u32 w2c_p0) {
   FUNC_PROLOGUE;
   u32 w2c_i0, w2c_i1, w2c_i2;
   w2c_i0 = w2c_p0;
@@ -337,7 +397,7 @@ static u32 w2c_fac(u32 w2c_p0) {
     w2c_i1 = w2c_p0;
     w2c_i2 = 1u;
     w2c_i1 -= w2c_i2;
-    w2c_i1 = w2c_fac(w2c_i1);
+    w2c_i1 = w2c_fac(module_instance, w2c_i1);
     w2c_i0 *= w2c_i1;
   }
   FUNC_EPILOGUE;
@@ -395,3 +455,104 @@ $ wat-desugar fac-flat.wat --fold -o fac-folded.wat
 
 The formatting is different and the variable and function names are gone, but
 the structure is the same.
+
+## Instantiate multiple instances of a module
+Since information about the execution context, such as memories, is encapsulated
+in the module instance structure, and a pointer to the structure is being passed through 
+function calls, multiple instances of the same module can be instantiated alongside
+one another.
+
+We can take a look at another version of the `main` function for a `rot13` example. By 
+declaring two sets of context information, two instances of `rot13` can be instantiated 
+in the same address space.
+
+```c
+#include "rot13.h"
+
+/* Define structure to hold the imports */
+struct Z_host_module_instance_t {
+  wasm_rt_memory_t s_memory;
+  char* s_input;
+};
+
+/* Accessor to access the memory member of the host */
+wasm_rt_memory_t* Z_hostZ_mem(struct Z_host_module_instance_t* instance) {
+  return &instance->s_memory;
+}
+
+/* Declare the implementations of the imports. */
+static u32 fill_buf(struct Z_host_module_instance_t* instance, u32 ptr, u32 size);
+static void buf_done(struct Z_host_module_instance_t* instance, u32 ptr, u32 size);
+
+/* Define host-provided functions under the names imported by the `rot13` instance */
+u32 Z_rot13Z_hostZ_fill_buf(struct Z_host_module_instance_t* instance,
+                            u32 ptr,
+                            u32 size) {
+  return fill_buf(instance, ptr, size);
+}
+
+void Z_rot13Z_hostZ_buf_done(struct Z_host_module_instance_t* instance,
+                             u32 ptr,
+                             u32 size) {
+  return buf_done(instance, ptr, size);
+}
+
+int main(int argc, char** argv) {
+  /* Initialize the rot13 module. */
+  Z_rot13_init_module();
+
+  /* Declare two instances of the `rot13` module. */
+  Z_rot13_module_instance_t rot13_instance_1;
+  Z_rot13_module_instance_t rot13_instance_2;
+
+  /* Create two `host` module instances to store the memory and current string */
+  struct Z_host_module_instance_t host_instance_1;
+  struct Z_host_module_instance_t host_instance_2;
+  /* Allocate 1 page of wasm memory (64KiB). */
+  wasm_rt_allocate_memory(&host_instance_1.s_memory, 1, 1);
+  wasm_rt_allocate_memory(&host_instance_2.s_memory, 1, 1);
+
+  /* Initialize the module instances */
+  Z_rot13_init(&rot13_instance_1, &host_instance_1);
+  Z_rot13_init(&rot13_instance_2, &host_instance_2);
+
+  /* Call `rot13` on first two argument, using the mangled name. */
+  assert(argc > 2);
+  s_input = argv[0];
+  Z_rot13Z_rot13(&rot13_instance_1);
+  s_input = argv[1];
+  Z_rot13Z_rot13(&rot13_instance_2);
+  
+  return 0;
+}
+
+/* Fill the wasm buffer with the input to be rot13'd.
+ *
+ * params:
+ *   ptr: The wasm memory address of the buffer to fill data.
+ *   size: The size of the buffer in wasm memory.
+ * result:
+ *   The number of bytes filled into the buffer. (Must be <= size).
+ */
+u32 fill_buf(struct Z_host_module_instance_t* instance, u32 ptr, u32 size) {
+  for (size_t i = 0; i < size; ++i) {
+    if (instance->s_input[i] == 0) {
+      return i;
+    }
+    instance->s_memory.data[ptr + i] = instance->s_input[i];
+  }
+  return size;
+}
+
+/* Called when the wasm buffer has been rot13'd.
+ *
+ * params:
+ *   ptr: The wasm memory address of the buffer.
+ *   size: The size of the buffer in wasm memory.
+ */
+void buf_done(struct Z_host_module_instance_t* instance, u32 ptr, u32 size) {
+  /* The output buffer is not necessarily null-terminated, so use the %*.s
+   * printf format to limit the number of characters printed. */
+  printf("%s -> %.*s\n", instance->s_input, (int)size, &instance->s_memory.data[ptr]);
+}
+```
