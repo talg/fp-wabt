@@ -9,36 +9,72 @@
 #define TRAP(x) (wasm_rt_trap(WASM_RT_TRAP_##x), 0)
 
 #define FUNC_PROLOGUE                                            \
-  if (++wasm_rt_call_stack_depth > WASM_RT_MAX_CALL_STACK_DEPTH) \
+  if (++module_instance->wasm_rt_call_stack_depth > WASM_RT_MAX_CALL_STACK_DEPTH) \
     TRAP(EXHAUSTION)
 
-#define FUNC_EPILOGUE --wasm_rt_call_stack_depth
+#define FUNC_EPILOGUE --module_instance->wasm_rt_call_stack_depth
 
 #define UNREACHABLE TRAP(UNREACHABLE)
 
 #define CALL_INDIRECT(table, t, ft, x, ...)          \
   (LIKELY((x) < table.size && table.data[x].func &&  \
           table.data[x].func_type == func_types[ft]) \
-       ? ((t)table.data[x].func)(__VA_ARGS__)        \
-       : TRAP(CALL_INDIRECT))
+       || TRAP(CALL_INDIRECT)                        \
+       , ((t)table.data[x].func)(__VA_ARGS__))
 
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER
+#define MEMCHECK(mem, a, t)
+#else
 #define MEMCHECK(mem, a, t)  \
   if (UNLIKELY((a) + sizeof(t) > mem->size)) TRAP(OOB)
+#endif
 
-#define DEFINE_LOAD(name, t1, t2, t3)              \
+#if WABT_BIG_ENDIAN
+static inline void load_data(void *dest, const void *src, size_t n) {
+  size_t i = 0;
+  u8 *dest_chars = dest;
+  memcpy(dest, src, n);
+  for (i = 0; i < (n>>1); i++) {
+    u8 cursor = dest_chars[i];
+    dest_chars[i] = dest_chars[n - i - 1];
+    dest_chars[n - i - 1] = cursor;
+  }
+}
+#define LOAD_DATA(m, o, i, s) load_data(&(m.data[m.size - o - s]), i, s)
+#define DEFINE_LOAD(name, t1, t2, t3)                                                 \
+  static inline t3 name(wasm_rt_memory_t* mem, u64 addr) {                            \
+    MEMCHECK(mem, addr, t1);                                                          \
+    t1 result;                                                                        \
+    __builtin_memcpy(&result, &mem->data[mem->size - addr - sizeof(t1)], sizeof(t1)); \
+    return (t3)(t2)result;                                                            \
+  }
+
+#define DEFINE_STORE(name, t1, t2)                                                     \
+  static inline void name(wasm_rt_memory_t* mem, u64 addr, t2 value) {                 \
+    MEMCHECK(mem, addr, t1);                                                           \
+    t1 wrapped = (t1)value;                                                            \
+    __builtin_memcpy(&mem->data[mem->size - addr - sizeof(t1)], &wrapped, sizeof(t1)); \
+  }
+#else
+static inline void load_data(void *dest, const void *src, size_t n) {
+  memcpy(dest, src, n);
+}
+#define LOAD_DATA(m, o, i, s) load_data(&(m.data[o]), i, s)
+#define DEFINE_LOAD(name, t1, t2, t3)                        \
   static inline t3 name(wasm_rt_memory_t* mem, u64 addr) {   \
-    MEMCHECK(mem, addr, t1);                       \
-    t1 result;                                     \
-    memcpy(&result, &mem->data[addr], sizeof(t1)); \
-    return (t3)(t2)result;                         \
+    MEMCHECK(mem, addr, t1);                                 \
+    t1 result;                                               \
+    __builtin_memcpy(&result, &mem->data[addr], sizeof(t1)); \
+    return (t3)(t2)result;                                   \
   }
 
-#define DEFINE_STORE(name, t1, t2)                           \
+#define DEFINE_STORE(name, t1, t2)                                     \
   static inline void name(wasm_rt_memory_t* mem, u64 addr, t2 value) { \
-    MEMCHECK(mem, addr, t1);                                 \
-    t1 wrapped = (t1)value;                                  \
-    memcpy(&mem->data[addr], &wrapped, sizeof(t1));          \
+    MEMCHECK(mem, addr, t1);                                           \
+    t1 wrapped = (t1)value;                                            \
+    __builtin_memcpy(&mem->data[addr], &wrapped, sizeof(t1));          \
   }
+#endif
 
 DEFINE_LOAD(i32_load, u32, u32, u32);
 DEFINE_LOAD(i64_load, u64, u64, u64);
@@ -114,25 +150,47 @@ DEFINE_STORE(i64_store32, u32, u64);
   : (UNLIKELY((x) == 0 && (y) == 0)) ? (signbit(x) ? y : x) \
   : (x > y) ? x : y)
 
-#define TRUNC_S(ut, st, ft, min, max, maxop, x)                             \
-   ((UNLIKELY((x) != (x))) ? TRAP(INVALID_CONVERSION)                       \
-  : (UNLIKELY((x) < (ft)(min) || (x) maxop (ft)(max))) ? TRAP(INT_OVERFLOW) \
-  : (ut)(st)(x))
+#define TRUNC_S(ut, st, ft, min, minop, max, x)                             \
+  ((UNLIKELY((x) != (x)))                        ? TRAP(INVALID_CONVERSION) \
+   : (UNLIKELY(!((x)minop(min) && (x) < (max)))) ? TRAP(INT_OVERFLOW)       \
+                                                 : (ut)(st)(x))
 
-#define I32_TRUNC_S_F32(x) TRUNC_S(u32, s32, f32, INT32_MIN, INT32_MAX, >=, x)
-#define I64_TRUNC_S_F32(x) TRUNC_S(u64, s64, f32, INT64_MIN, INT64_MAX, >=, x)
-#define I32_TRUNC_S_F64(x) TRUNC_S(u32, s32, f64, INT32_MIN, INT32_MAX, >,  x)
-#define I64_TRUNC_S_F64(x) TRUNC_S(u64, s64, f64, INT64_MIN, INT64_MAX, >=, x)
+#define I32_TRUNC_S_F32(x) TRUNC_S(u32, s32, f32, (f32)INT32_MIN, >=, 2147483648.f, x)
+#define I64_TRUNC_S_F32(x) TRUNC_S(u64, s64, f32, (f32)INT64_MIN, >=, (f32)INT64_MAX, x)
+#define I32_TRUNC_S_F64(x) TRUNC_S(u32, s32, f64, -2147483649., >, 2147483648., x)
+#define I64_TRUNC_S_F64(x) TRUNC_S(u64, s64, f64, (f64)INT64_MIN, >=, (f64)INT64_MAX, x)
 
-#define TRUNC_U(ut, ft, max, maxop, x)                                    \
-   ((UNLIKELY((x) != (x))) ? TRAP(INVALID_CONVERSION)                     \
-  : (UNLIKELY((x) <= (ft)-1 || (x) maxop (ft)(max))) ? TRAP(INT_OVERFLOW) \
-  : (ut)(x))
+#define TRUNC_U(ut, ft, max, x)                                            \
+  ((UNLIKELY((x) != (x)))                       ? TRAP(INVALID_CONVERSION) \
+   : (UNLIKELY(!((x) > (ft)-1 && (x) < (max)))) ? TRAP(INT_OVERFLOW)       \
+                                                : (ut)(x))
 
-#define I32_TRUNC_U_F32(x) TRUNC_U(u32, f32, UINT32_MAX, >=, x)
-#define I64_TRUNC_U_F32(x) TRUNC_U(u64, f32, UINT64_MAX, >=, x)
-#define I32_TRUNC_U_F64(x) TRUNC_U(u32, f64, UINT32_MAX, >,  x)
-#define I64_TRUNC_U_F64(x) TRUNC_U(u64, f64, UINT64_MAX, >=, x)
+#define I32_TRUNC_U_F32(x) TRUNC_U(u32, f32, 4294967296.f, x)
+#define I64_TRUNC_U_F32(x) TRUNC_U(u64, f32, (f32)UINT64_MAX, x)
+#define I32_TRUNC_U_F64(x) TRUNC_U(u32, f64, 4294967296.,  x)
+#define I64_TRUNC_U_F64(x) TRUNC_U(u64, f64, (f64)UINT64_MAX, x)
+
+#define TRUNC_SAT_S(ut, st, ft, min, smin, minop, max, smax, x) \
+  ((UNLIKELY((x) != (x)))         ? 0                           \
+   : (UNLIKELY(!((x)minop(min)))) ? smin                        \
+   : (UNLIKELY(!((x) < (max))))   ? smax                        \
+                                  : (ut)(st)(x))
+
+#define I32_TRUNC_SAT_S_F32(x) TRUNC_SAT_S(u32, s32, f32, (f32)INT32_MIN, INT32_MIN, >=, 2147483648.f, INT32_MAX, x)
+#define I64_TRUNC_SAT_S_F32(x) TRUNC_SAT_S(u64, s64, f32, (f32)INT64_MIN, INT64_MIN, >=, (f32)INT64_MAX, INT64_MAX, x)
+#define I32_TRUNC_SAT_S_F64(x) TRUNC_SAT_S(u32, s32, f64, -2147483649., INT32_MIN, >, 2147483648., INT32_MAX, x)
+#define I64_TRUNC_SAT_S_F64(x) TRUNC_SAT_S(u64, s64, f64, (f64)INT64_MIN, INT64_MIN, >=, (f64)INT64_MAX, INT64_MAX, x)
+
+#define TRUNC_SAT_U(ut, ft, max, smax, x) \
+  ((UNLIKELY((x) != (x)))        ? 0      \
+   : (UNLIKELY(!((x) > (ft)-1))) ? 0      \
+   : (UNLIKELY(!((x) < (max))))  ? smax   \
+                                 : (ut)(x))
+
+#define I32_TRUNC_SAT_U_F32(x) TRUNC_SAT_U(u32, f32, 4294967296.f, UINT32_MAX, x)
+#define I64_TRUNC_SAT_U_F32(x) TRUNC_SAT_U(u64, f32, (f32)UINT64_MAX, UINT64_MAX, x)
+#define I32_TRUNC_SAT_U_F64(x) TRUNC_SAT_U(u32, f64, 4294967296., UINT32_MAX,  x)
+#define I64_TRUNC_SAT_U_F64(x) TRUNC_SAT_U(u64, f64, (f64)UINT64_MAX, UINT64_MAX, x)
 
 #define DEFINE_REINTERPRET(name, t1, t2)  \
   static inline t2 name(t1 x) {           \
@@ -153,50 +211,52 @@ static void init_func_types(void) {
   func_types[0] = wasm_rt_register_func_type(1, 1, WASM_RT_I32, WASM_RT_I32);
 }
 
-static u32 fac(u32);
+static u32 w2c_fac(Z_fac_module_instance_t *, u32);
 
-static void init_globals(void) {
+static void init_globals(Z_fac_module_instance_t *module_instance) {
 }
 
-static u32 fac(u32 p0) {
+static u32 w2c_fac(Z_fac_module_instance_t *module_instance, u32 w2c_p0) {
   FUNC_PROLOGUE;
-  u32 i0, i1, i2;
-  i0 = p0;
-  i1 = 0u;
-  i0 = i0 == i1;
-  if (i0) {
-    i0 = 1u;
+  u32 w2c_i0, w2c_i1, w2c_i2;
+  w2c_i0 = w2c_p0;
+  w2c_i1 = 0u;
+  w2c_i0 = w2c_i0 == w2c_i1;
+  if (w2c_i0) {
+    w2c_i0 = 1u;
   } else {
-    i0 = p0;
-    i1 = p0;
-    i2 = 1u;
-    i1 -= i2;
-    i1 = fac(i1);
-    i0 *= i1;
+    w2c_i0 = w2c_p0;
+    w2c_i1 = w2c_p0;
+    w2c_i2 = 1u;
+    w2c_i1 -= w2c_i2;
+    w2c_i1 = w2c_fac(module_instance, w2c_i1);
+    w2c_i0 *= w2c_i1;
   }
   FUNC_EPILOGUE;
-  return i0;
+  return w2c_i0;
 }
 
-static void init_memory(void) {
+
+static void init_memory(Z_fac_module_instance_t *module_instance) {
+  wasm_rt_allocate_memory(&module_instance->w2c_M0, 1, 65536);
 }
 
-static void init_table(void) {
+static void init_table(Z_fac_module_instance_t *module_instance) {
   uint32_t offset;
 }
 
 /* export: 'fac' */
-u32 (*WASM_RT_ADD_PREFIX(Z_facZ_ii))(u32);
+u32 (*WASM_RT_ADD_PREFIX(Z_facZ_ii))(Z_fac_module_instance_t *, u32);
 
-static void init_exports(void) {
+static void init_exports(Z_fac_module_instance_t *module_instance) {
   /* export: 'fac' */
-  WASM_RT_ADD_PREFIX(Z_facZ_ii) = (&fac);
+  WASM_RT_ADD_PREFIX(Z_facZ_ii) = (&w2c_fac);
 }
 
-void WASM_RT_ADD_PREFIX(init)(void) {
+void WASM_RT_ADD_PREFIX(init)(Z_fac_module_instance_t *module_instance) {
   init_func_types();
-  init_globals();
-  init_memory();
-  init_table();
-  init_exports();
+  init_globals(module_instance);
+  init_memory(module_instance);
+  init_table(module_instance);
+  init_exports(module_instance);
 }
