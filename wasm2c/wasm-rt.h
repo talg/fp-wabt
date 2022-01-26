@@ -222,9 +222,6 @@ extern void wasm_rt_allocate_table(wasm_rt_table_t*,
                                    uint32_t elements,
                                    uint32_t max_elements);
 
-/** Current call stack depth. */
-extern uint32_t wasm_rt_call_stack_depth;
-
 #ifdef _WIN32
 float wasm_rt_truncf(float x);
 double wasm_rt_trunc(double x);

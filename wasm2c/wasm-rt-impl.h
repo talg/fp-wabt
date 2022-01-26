@@ -54,9 +54,7 @@ extern uint32_t g_saved_call_stack_depth;
  *   my_wasm_func();
  * ```
  */
-#define wasm_rt_impl_try()                              \
-  (g_saved_call_stack_depth = wasm_rt_call_stack_depth, \
-   WASM_RT_SETJMP(g_jmp_buf))
+#define wasm_rt_impl_try() (WASM_RT_SETJMP(g_jmp_buf))
 
 #ifdef __cplusplus
 }
