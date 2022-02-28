@@ -35,7 +35,6 @@ typedef struct {
 } Z_fac_module_instance_t;
 
 extern void WASM_RT_ADD_PREFIX(init)(Z_fac_module_instance_t *);
-
 /* export: 'fac' */
 extern u32 (*WASM_RT_ADD_PREFIX(Z_facZ_ii))(Z_fac_module_instance_t *, u32);
 #ifdef __cplusplus

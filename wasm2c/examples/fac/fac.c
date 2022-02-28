@@ -22,11 +22,13 @@
        || TRAP(CALL_INDIRECT)                        \
        , ((t)table.data[x].func)(__VA_ARGS__))
 
+#define RANGE_CHECK(mem, a, t) \
+  if (UNLIKELY((a) + sizeof(t) > mem->size)) TRAP(OOB)
+
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER
 #define MEMCHECK(mem, a, t)
 #else
-#define MEMCHECK(mem, a, t)  \
-  if (UNLIKELY((a) + sizeof(t) > mem->size)) TRAP(OOB)
+#define MEMCHECK(mem, a, t) RANGE_CHECK(mem, a, t)
 #endif
 
 #if WABT_BIG_ENDIAN
@@ -40,7 +42,10 @@ static inline void load_data(void *dest, const void *src, size_t n) {
     dest_chars[n - i - 1] = cursor;
   }
 }
-#define LOAD_DATA(m, o, i, s) load_data(&(m.data[m.size - o - s]), i, s)
+#define LOAD_DATA(m, o, i, s) do {              \
+    RANGE_CHECK((&m), m.size - o - s, char[s]); \
+    load_data(&(m.data[m.size - o - s]), i, s); \
+  } while (0)
 #define DEFINE_LOAD(name, t1, t2, t3)                                                 \
   static inline t3 name(wasm_rt_memory_t* mem, u64 addr) {                            \
     MEMCHECK(mem, addr, t1);                                                          \
@@ -59,7 +64,10 @@ static inline void load_data(void *dest, const void *src, size_t n) {
 static inline void load_data(void *dest, const void *src, size_t n) {
   memcpy(dest, src, n);
 }
-#define LOAD_DATA(m, o, i, s) load_data(&(m.data[o]), i, s)
+#define LOAD_DATA(m, o, i, s) do { \
+    RANGE_CHECK((&m), o, char[s]); \
+    load_data(&(m.data[o]), i, s); \
+  } while (0)
 #define DEFINE_LOAD(name, t1, t2, t3)                        \
   static inline t3 name(wasm_rt_memory_t* mem, u64 addr) {   \
     MEMCHECK(mem, addr, t1);                                 \
@@ -213,9 +221,6 @@ static void init_func_types(void) {
 
 static u32 w2c_fac(Z_fac_module_instance_t *, u32);
 
-static void init_globals(Z_fac_module_instance_t *module_instance) {
-}
-
 static u32 w2c_fac(Z_fac_module_instance_t *module_instance, u32 w2c_p0) {
   FUNC_PROLOGUE;
   u32 w2c_i0, w2c_i1, w2c_i2;
@@ -236,6 +241,9 @@ static u32 w2c_fac(Z_fac_module_instance_t *module_instance, u32 w2c_p0) {
   return w2c_i0;
 }
 
+static void init_globals(Z_fac_module_instance_t *module_instance) {
+}
+
 
 static void init_memory(Z_fac_module_instance_t *module_instance) {
   wasm_rt_allocate_memory(&module_instance->w2c_M0, 1, 65536);
@@ -244,19 +252,12 @@ static void init_memory(Z_fac_module_instance_t *module_instance) {
 static void init_table(Z_fac_module_instance_t *module_instance) {
   uint32_t offset;
 }
-
 /* export: 'fac' */
-u32 (*WASM_RT_ADD_PREFIX(Z_facZ_ii))(Z_fac_module_instance_t *, u32);
-
-static void init_exports(Z_fac_module_instance_t *module_instance) {
-  /* export: 'fac' */
-  WASM_RT_ADD_PREFIX(Z_facZ_ii) = (&w2c_fac);
-}
+u32 (*WASM_RT_ADD_PREFIX(Z_facZ_ii))(Z_fac_module_instance_t *, u32) = (&w2c_fac);
 
 void WASM_RT_ADD_PREFIX(init)(Z_fac_module_instance_t *module_instance) {
   init_func_types();
   init_globals(module_instance);
   init_memory(module_instance);
   init_table(module_instance);
-  init_exports(module_instance);
 }
