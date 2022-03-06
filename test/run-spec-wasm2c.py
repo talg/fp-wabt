@@ -283,7 +283,6 @@ class CWriter(object):
     def _WriteModuleCommand(self, command):
         self.module_idx += 1
         self.out_file.write('%s %s;\n' % (MangleStateInfoTypeName(command['filename']), self.GetStateInfoName()))
-        self.out_file.write('memset(&%s, 0, sizeof(%s));\n' % (self.GetStateInfoName(), MangleStateInfoTypeName(command['filename'])))
         self._GenerateModuleImports(command)
         self.out_file.write('%sinit(&%s);\n' % (self.GetModulePrefix(), self.GetStateInfoName()))
 

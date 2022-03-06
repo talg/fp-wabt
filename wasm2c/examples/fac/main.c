@@ -16,7 +16,6 @@ int main(int argc, char** argv) {
 
   /* Declare and initialize the structure for context info. */
   Z_fac_module_instance_t module_instance;
-  module_instance.wasm_rt_call_stack_depth = 0;
 
   /* Initialize the fac module. Since we didn't define WASM_RT_MODULE_PREFIX,
   the initialization function is called `init`. */
