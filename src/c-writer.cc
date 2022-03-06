@@ -1367,6 +1367,7 @@ void CWriter::WriteInit() {
   Write("init_globals(module_instance);", Newline());
   Write("init_memory(module_instance);", Newline());
   Write("init_table(module_instance);", Newline());
+  Write("module_instance->wasm_rt_call_stack_depth = 0;", Newline());
   for (Var* var : module_->starts) {
     Write(ExternalRef(module_->GetFunc(*var)->name), "(module_instance);",
           Newline());
