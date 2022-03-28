@@ -262,6 +262,8 @@ class CWriter {
   void WriteExports(WriteExportsKind);
   void WriteInitDecl();
   void WriteInit();
+  void WriteModuleInstanceFreeDecl();
+  void WriteModuleInstanceFree();
   void WriteInitInstanceImport();
   void WriteFuncs();
   void Write(const Func&);
@@ -840,6 +842,12 @@ void CWriter::WriteInitDecl() {
     Write(", struct ", MangleModuleInstanceTypeName(import_module_name), "*");
   }
   Write(");", Newline());
+}
+
+void CWriter::WriteModuleInstanceFreeDecl() {
+  Write("extern void " + MangleName(module_name_) + "_free(",
+        MangleModuleInstanceTypeName(module_name_), "*);");
+  Write(Newline());
 }
 
 void CWriter::WriteInitExpr(const ExprList& expr_list) {
@@ -1463,7 +1471,6 @@ void CWriter::WriteInit() {
         OpenBrace());
   Write("init_func_types();", Newline());
   Write(CloseBrace(), Newline());
-  Write(Newline());
 
   Write(Newline(), "void " + MangleName(module_name_) + "_init(",
         MangleModuleInstanceTypeName(module_name_), "* module_instance");
@@ -1499,6 +1506,40 @@ void CWriter::WriteInit() {
     }
     Write(Newline());
   }
+  Write(CloseBrace(), Newline());
+}
+
+void CWriter::WriteModuleInstanceFree() {
+  Write(Newline(), "void " + MangleName(module_name_) + "_free(",
+        MangleModuleInstanceTypeName(module_name_), "* module_instance) ",
+        OpenBrace());
+
+  if (module_->types.size()) {
+    // If there are no types there cannot be any table entries either.
+    assert(module_->tables.size() <= 1);
+    Index table_index = 0;
+    for (const Table* table : module_->tables) {
+      bool is_import = table_index < module_->num_table_imports;
+      if (!is_import) {
+        Write("wasm_rt_free_table(", ExternalInstancePtr(table->name), ");",
+              Newline());
+      }
+      ++table_index;
+    }
+  }
+
+  {
+    Index memory_index = 0;
+    for (const Memory* memory : module_->memories) {
+      bool is_import = memory_index < module_->num_memory_imports;
+      if (!is_import) {
+        Write("wasm_rt_free_memory(", ExternalInstancePtr(memory->name), ");",
+              Newline());
+      }
+      ++memory_index;
+    }
+  }
+
   Write(CloseBrace(), Newline());
 }
 
@@ -2710,6 +2751,7 @@ void CWriter::WriteCHeader() {
   Write(s_header_top);
   WriteModuleInstance();
   WriteInitDecl();
+  WriteModuleInstanceFreeDecl();
   WriteMultivalueTypes();
   WriteImports();
   WriteExports(WriteExportsKind::Declarations);
@@ -2729,6 +2771,7 @@ void CWriter::WriteCSource() {
   WriteExports(WriteExportsKind::Definitions);
   WriteInitInstanceImport();
   WriteInit();
+  WriteModuleInstanceFree();
 }
 
 Result CWriter::WriteModule(const Module& module) {
