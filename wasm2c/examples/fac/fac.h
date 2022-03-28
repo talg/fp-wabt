@@ -31,9 +31,10 @@ typedef struct Z_fac_module_instance_t {
 
 extern void Z_fac_init_module();
 extern void Z_fac_init(Z_fac_module_instance_t*);
-extern void Z_fac_free(Z_fac_module_instance_t *);
+extern void Z_fac_free(Z_fac_module_instance_t*);
+
 /* export: 'fac' */
-extern u32 Z_facZ_fac(Z_fac_module_instance_t *, u32);
+extern u32 Z_fac_Z_fac(Z_fac_module_instance_t*, u32);
 #ifdef __cplusplus
 }
 #endif

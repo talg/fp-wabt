@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Uncomment this to define fac_init and fac_Z_facZ_ii instead. */
-/* #define WASM_RT_MODULE_PREFIX fac_ */
-
 #include "fac.h"
 
 int main(int argc, char** argv) {
@@ -14,15 +11,18 @@ int main(int argc, char** argv) {
   to a `u32`, which is what `fac` expects. */
   u32 x = atoi(argv[1]);
 
-  /* Declare and initialize the structure for context info. */
+  /* Initialize the `fac` module (this registers the module's function types in
+   * a global data structure) */
+  Z_fac_init_module();
+
+  /* Declare an instance of the `fac` module. */
   Z_fac_module_instance_t module_instance;
 
-  /* Initialize the fac module. Since we didn't define WASM_RT_MODULE_PREFIX,
-  the initialization function is called `init`. */
-  init(&module_instance);
+  /* Initialize the module instance. */
+  Z_fac_init(&module_instance);
 
   /* Call `fac`, using the mangled name. */
-  u32 result = Z_facZ_ii(&module_instance, x);
+  u32 result = Z_fac_Z_fac(&module_instance, x);
 
   /* Print the result. */
   printf("fac(%u) -> %u\n", x, result);
