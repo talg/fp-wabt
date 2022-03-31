@@ -86,7 +86,7 @@ def F64ToC(f64_bits):
 
 def MangleType(t):
     return {'i32': 'i', 'i64': 'j', 'f32': 'f', 'f64': 'd',
-            'externref': 'e', 'funcref': 'f'}[t]
+            'externref': 'e', 'funcref': 'r'}[t]
 
 
 def MangleTypes(types):
@@ -232,7 +232,7 @@ class CWriter(object):
                     line = headerfile[i]
                     if "import: " in line:
                         next_line = headerfile[i + 1]
-                        if "extern" in next_line:
+                        if "extern " in next_line:
                             line_split = line.split()
                             import_module_name = MangleName(line_split[2][1:-1])
                             import_field_name = MangleName(line_split[3][1:-1])
@@ -377,9 +377,15 @@ class CWriter(object):
         elif type_ == 'f64':
             return F64ToC(int(value))
         elif type_ == 'externref':
-            return 'externref(%s)' % value
+            if value == 'null':
+                return 'externref(0)'
+            else:
+                return 'externref(%s+1)' % value # externref(0) is not null
         elif type_ == 'funcref':
-            return 'funcref(%s)' % value
+            if value == 'null':
+                return 'funcref(0)'
+            else:
+                return 'funcref(%s)' % value
         else:
             assert False
 
