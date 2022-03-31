@@ -437,7 +437,7 @@ def Compile(cc, c_filename, out_dir, *args):
     o_filename = utils.ChangeDir(utils.ChangeExt(c_filename, ext), out_dir)
     args = list(args)
     if IS_WINDOWS:
-        args += ['/nologo', '/MDd', '/c', c_filename, '/Fo' + o_filename]
+        args += ['/nologo', '/MDd', '/std:c17', '/c', c_filename, '/Fo' + o_filename]
     else:
         args += ['-c', c_filename, '-o', o_filename,
                  '-Wall', '-Werror', '-Wno-unused',
