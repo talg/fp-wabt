@@ -219,33 +219,49 @@ void wasm_rt_free(void) {
 #endif
 }
 
-void wasm_rt_allocate_memory(wasm_rt_memory_t* memory,
-                             uint32_t initial_pages,
-                             uint32_t max_pages) {
+void wasm_rt_allocate_memory_helper(wasm_rt_memory_t* memory,
+                                    uint32_t initial_pages,
+                                    uint32_t max_pages,
+                                    bool hw_checked) {
   uint32_t byte_length = initial_pages * PAGE_SIZE;
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-  /* Reserve 8GiB. */
-  void* addr = os_mmap(0x200000000ul);
+  if (hw_checked) {
+    /* Reserve 8GiB. */
+    void* addr = os_mmap(0x200000000ul);
 
-  if (addr == (void*)-1) {
-    os_print_last_error("os_mmap failed.");
-    abort();
+    if (addr == (void*)-1) {
+      os_print_last_error("os_mmap failed.");
+      abort();
+    }
+    int ret = os_mprotect(addr, byte_length);
+    if (ret != 0) {
+      os_print_last_error("os_mprotect failed.");
+      abort();
+    }
+    memory->data = addr;
+  } else {
+    memory->data = calloc(byte_length, 1);
   }
-  int ret = os_mprotect(addr, byte_length);
-  if (ret != 0) {
-    os_print_last_error("os_mprotect failed.");
-    abort();
-  }
-  memory->data = addr;
-#else
-  memory->data = calloc(byte_length, 1);
-#endif
   memory->size = byte_length;
   memory->pages = initial_pages;
   memory->max_pages = max_pages;
 }
 
-uint32_t wasm_rt_grow_memory(wasm_rt_memory_t* memory, uint32_t delta) {
+void wasm_rt_allocate_memory_sw_checked(wasm_rt_memory_t* memory,
+                                        uint32_t initial_pages,
+                                        uint32_t max_pages) {
+  wasm_rt_allocate_memory_helper(memory, initial_pages, max_pages, false);
+}
+
+void wasm_rt_allocate_memory(wasm_rt_memory_t* memory,
+                             uint32_t initial_pages,
+                             uint32_t max_pages) {
+  wasm_rt_allocate_memory_helper(memory, initial_pages, max_pages,
+                                 WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX);
+}
+
+uint32_t wasm_rt_grow_memory_helper(wasm_rt_memory_t* memory,
+                                    uint32_t delta,
+                                    bool hw_checked) {
   uint32_t old_pages = memory->pages;
   uint32_t new_pages = memory->pages + delta;
   if (new_pages == 0) {
@@ -257,21 +273,23 @@ uint32_t wasm_rt_grow_memory(wasm_rt_memory_t* memory, uint32_t delta) {
   uint32_t old_size = old_pages * PAGE_SIZE;
   uint32_t new_size = new_pages * PAGE_SIZE;
   uint32_t delta_size = delta * PAGE_SIZE;
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-  uint8_t* new_data = memory->data;
-  int ret = os_mprotect(new_data + old_size, delta_size);
-  if (ret != 0) {
-    return (uint32_t)-1;
-  }
-#else
-  uint8_t* new_data = realloc(memory->data, new_size);
-  if (new_data == NULL) {
-    return (uint32_t)-1;
-  }
+  uint8_t* new_data;
+  if (hw_checked) {
+    new_data = memory->data;
+    int ret = os_mprotect(new_data + old_size, delta_size);
+    if (ret != 0) {
+      return (uint32_t)-1;
+    }
+  } else {
+    new_data = realloc(memory->data, new_size);
+    if (new_data == NULL) {
+      return (uint32_t)-1;
+    }
+
 #if !WABT_BIG_ENDIAN
-  memset(new_data + old_size, 0, delta_size);
+    memset(new_data + old_size, 0, delta_size);
 #endif
-#endif
+  }
 #if WABT_BIG_ENDIAN
   memmove(new_data + new_size - old_size, new_data, old_size);
   memset(new_data, 0, delta_size);
@@ -282,11 +300,29 @@ uint32_t wasm_rt_grow_memory(wasm_rt_memory_t* memory, uint32_t delta) {
   return old_pages;
 }
 
+uint32_t wasm_rt_grow_memory_sw_checked(wasm_rt_memory_t* memory,
+                                        uint32_t delta) {
+  return wasm_rt_grow_memory_helper(memory, delta, false);
+}
+
+uint32_t wasm_rt_grow_memory(wasm_rt_memory_t* memory, uint32_t delta) {
+  return wasm_rt_grow_memory_helper(memory, delta,
+                                    WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX);
+}
+
+void wasm_rt_free_memory_hw_checked(wasm_rt_memory_t* memory) {
+  os_munmap(memory->data, memory->size);  // ignore error?
+}
+
+void wasm_rt_free_memory_sw_checked(wasm_rt_memory_t* memory) {
+  free(memory->data);
+}
+
 void wasm_rt_free_memory(wasm_rt_memory_t* memory) {
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-  os_munmap(memory->data, memory->size);  // ignore error?
+  wasm_rt_free_memory_hw_checked(memory);
 #else
-  free(memory->data);
+  wasm_rt_free_memory_sw_checked(memory);
 #endif
 }
 

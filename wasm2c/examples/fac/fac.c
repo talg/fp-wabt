@@ -60,11 +60,23 @@ static inline void load_data(void *dest, const void *src, size_t n) {
     wasm_rt_memcpy(&result, &mem->data[mem->size - addr - sizeof(t1)], \
                    sizeof(t1));                                        \
     return (t3)(t2)result;                                             \
+  }                                                                    \
+  static inline t3 name ##_checked(wasm_rt_memory_t* mem, u64 addr) {             \
+    RANGE_CHECK(mem, addr, sizeof(t1));                               \
+    t1 result;                                                         \
+    wasm_rt_memcpy(&result, &mem->data[mem->size - addr - sizeof(t1)], \
+                   sizeof(t1));                                        \
+    return (t3)(t2)result;                                             \
   }
-
 #define DEFINE_STORE(name, t1, t2)                                      \
   static inline void name(wasm_rt_memory_t* mem, u64 addr, t2 value) {  \
     MEMCHECK(mem, addr, t1);                                            \
+    t1 wrapped = (t1)value;                                             \
+    wasm_rt_memcpy(&mem->data[mem->size - addr - sizeof(t1)], &wrapped, \
+                   sizeof(t1));                                         \
+  }                                                                     \
+  static inline void name ##_checked(wasm_rt_memory_t* mem, u64 addr, t2 value) {  \
+    RANGE_CHECK(mem, addr, sizeof(t1));
     t1 wrapped = (t1)value;                                             \
     wasm_rt_memcpy(&mem->data[mem->size - addr - sizeof(t1)], &wrapped, \
                    sizeof(t1));                                         \
@@ -83,11 +95,22 @@ static inline void load_data(void *dest, const void *src, size_t n) {
     t1 result;                                             \
     wasm_rt_memcpy(&result, &mem->data[addr], sizeof(t1)); \
     return (t3)(t2)result;                                 \
+  }                                                        \
+  static inline t3 name ## _checked(wasm_rt_memory_t* mem, u64 addr) { \
+    RANGE_CHECK(mem, addr, sizeof(t1));                    \
+    t1 result;                                             \
+    wasm_rt_memcpy(&result, &mem->data[addr], sizeof(t1)); \
+    return (t3)(t2)result;                                 \
   }
 
 #define DEFINE_STORE(name, t1, t2)                                     \
   static inline void name(wasm_rt_memory_t* mem, u64 addr, t2 value) { \
     MEMCHECK(mem, addr, t1);                                           \
+    t1 wrapped = (t1)value;                                            \
+    wasm_rt_memcpy(&mem->data[addr], &wrapped, sizeof(t1));            \
+  }                                                                    \
+  static inline void name ## _checked(wasm_rt_memory_t* mem, u64 addr, t2 value) { \
+    RANGE_CHECK(mem, addr, sizeof(t1));                                \
     t1 wrapped = (t1)value;                                            \
     wasm_rt_memcpy(&mem->data[addr], &wrapped, sizeof(t1));            \
   }
