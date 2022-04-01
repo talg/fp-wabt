@@ -1501,8 +1501,14 @@ void CWriter::WriteDataInitializers() {
       const Memory* memory = module_->memories[i];
       uint32_t max =
           memory->page_limits.has_max ? memory->page_limits.max : 65536;
-      Write("wasm_rt_allocate_memory(", ExternalInstancePtr(memory->name), ", ",
-            memory->page_limits.initial, ", ", max, ");", Newline());
+      if (memory->bounds_checked) {
+        Write("wasm_rt_allocate_memory_sw_checked(",
+              ExternalInstancePtr(memory->name), ", ",
+              memory->page_limits.initial, ", ", max, ");", Newline());
+      } else {
+        Write("wasm_rt_allocate_memory(", ExternalInstancePtr(memory->name),
+              ", ", memory->page_limits.initial, ", ", max, ");", Newline());
+      }
     }
   }
   for (const DataSegment* data_segment : module_->data_segments) {
@@ -1881,8 +1887,13 @@ void CWriter::WriteFree() {
     for (const Memory* memory : module_->memories) {
       bool is_import = memory_index < module_->num_memory_imports;
       if (!is_import) {
-        Write("wasm_rt_free_memory(", ExternalInstancePtr(memory->name), ");",
-              Newline());
+        if (memory->bounds_checked) {
+          Write("wasm_rt_free_memory_sw_checked(",
+                ExternalInstancePtr(memory->name), ");", Newline());
+        } else {
+          Write("wasm_rt_free_memory(", ExternalInstancePtr(memory->name), ");",
+                Newline());
+        }
       }
       ++memory_index;
     }
@@ -2700,9 +2711,15 @@ void CWriter::Write(const ExprList& exprs) {
         Memory* memory = module_->memories[module_->GetMemoryIndex(
             cast<MemoryGrowExpr>(&expr)->memidx)];
 
-        Write(StackVar(0), " = wasm_rt_grow_memory(",
-              ExternalInstancePtr(memory->name), ", ", StackVar(0), ");",
-              Newline());
+        if (memory->bounds_checked) {
+          Write(StackVar(0), " = wasm_rt_grow_memory_sw_checked(",
+                ExternalInstancePtr(memory->name), ", ", StackVar(0), ");",
+                Newline());
+        } else {
+          Write(StackVar(0), " = wasm_rt_grow_memory(",
+                ExternalInstancePtr(memory->name), ", ", StackVar(0), ");",
+                Newline());
+        }
         break;
       }
 
@@ -3285,9 +3302,10 @@ void CWriter::Write(const LoadExpr& expr) {
   }
 
   Memory* memory = module_->memories[module_->GetMemoryIndex(expr.memidx)];
+  const char* suffix = memory->bounds_checked ? "_checked" : "";
 
   Type result_type = expr.opcode.GetResultType();
-  Write(StackVar(0, result_type), " = ", func, "(",
+  Write(StackVar(0, result_type), " = ", func, suffix, "(",
         ExternalInstancePtr(memory->name), ", (u64)(", StackVar(0), ")");
   if (expr.offset != 0)
     Write(" + ", expr.offset, "u");
@@ -3332,9 +3350,10 @@ void CWriter::Write(const StoreExpr& expr) {
   }
 
   Memory* memory = module_->memories[module_->GetMemoryIndex(expr.memidx)];
+  const char* suffix = memory->bounds_checked ? "_checked" : "";
 
-  Write(func, "(", ExternalInstancePtr(memory->name), ", (u64)(", StackVar(1),
-        ")");
+  Write(func, suffix, "(", ExternalInstancePtr(memory->name), ", (u64)(",
+        StackVar(1), ")");
   if (expr.offset != 0)
     Write(" + ", expr.offset);
   Write(", ", StackVar(0), ");", Newline());

@@ -896,10 +896,11 @@ struct ElemSegment {
 };
 
 struct Memory {
-  explicit Memory(std::string_view name) : name(name) {}
+  explicit Memory(std::string_view name) : name(name), bounds_checked(false) {}
 
   std::string name;
   Limits page_limits;
+  bool bounds_checked;
 };
 
 struct DataSegment {
