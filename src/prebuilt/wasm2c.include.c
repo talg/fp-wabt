@@ -5,6 +5,11 @@ const char SECTION_NAME(includes)[] =
 "#include <string.h>\n"
 "#include <assert.h>\n"
 "#include <stddef.h>\n"
+"#if defined(_MSC_VER)\n"
+"#include <malloc.h>\n"
+"#else\n"
+"#include <alloca.h>\n"
+"#endif\n"
 ;
 
 const char SECTION_NAME(declarations)[] =
@@ -121,6 +126,8 @@ const char SECTION_NAME(declarations)[] =
 "DEFINE_STORE(i64_store32, u32, u64)\n"
 "\n"
 "#if defined(_MSC_VER)\n"
+"\n"
+"#define alloca _alloca\n"
 "\n"
 "#include <intrin.h>\n"
 "\n"

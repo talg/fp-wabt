@@ -3,6 +3,11 @@
 #include <string.h>
 #include <assert.h>
 #include <stddef.h>
+#if defined(_MSC_VER)
+#include <malloc.h>
+#else
+#include <alloca.h>
+#endif
 
 #include "fac.h"
 
@@ -118,6 +123,8 @@ DEFINE_STORE(i64_store16, u16, u64)
 DEFINE_STORE(i64_store32, u32, u64)
 
 #if defined(_MSC_VER)
+
+#define alloca _alloca
 
 #include <intrin.h>
 
