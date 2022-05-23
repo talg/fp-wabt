@@ -342,6 +342,7 @@ def Compile(cc, c_filename, out_dir, *args):
         args += ['/nologo', '/MDd', '/c', c_filename, '/Fo' + o_filename]
     else:
         args += ['-c', c_filename, '-o', o_filename,
+                 '-O2',
                  '-Wall', '-Werror', '-Wno-unused',
                  '-Wno-tautological-constant-out-of-range-compare',
                  '-Wno-infinite-recursion',
