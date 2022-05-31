@@ -2331,8 +2331,8 @@ void CWriter::Write(const ExprList& exprs) {
                   ");", Newline());
             break;
           case Type::ExternRef:
-            Write(StackVar(0, Type::I32), " = (", StackVar(0), " == NULL", ");",
-                  Newline());
+            Write(StackVar(0, Type::I32), " = (", StackVar(0),
+                  " == wasm_rt_externref_null_value);", Newline());
             break;
           default:
             WABT_UNREACHABLE;
@@ -3185,7 +3185,7 @@ const char* CWriter::GetReferenceNullValue(const Type& type) {
     case Type::FuncRef:
       return "(wasm_rt_funcref_t){0, NULL, 0}";
     case Type::ExternRef:
-      return "(wasm_rt_externref_t)NULL";
+      return "wasm_rt_externref_null_value";
     default:
       WABT_UNREACHABLE;
   }

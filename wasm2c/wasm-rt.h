@@ -157,6 +157,9 @@ typedef struct {
 /** An external reference. These are opaque have meaning only to the host. */
 typedef void* wasm_rt_externref_t;
 
+/** Default (null) value of an externref */
+static const wasm_rt_externref_t wasm_rt_externref_null_value = NULL;
+
 /** A Memory object. */
 typedef struct {
   /** The linear memory data, with a byte length of `size`. */
