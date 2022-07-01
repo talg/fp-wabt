@@ -24,7 +24,6 @@ typedef double f64;
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 void Z_fac_init(void);
 void Z_fac_free(void);
 

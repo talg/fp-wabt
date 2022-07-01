@@ -20,4 +20,3 @@ typedef double f64;
 #ifdef __cplusplus
 extern "C" {
 #endif
-
