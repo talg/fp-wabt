@@ -446,6 +446,30 @@ function(wabt_executable)
 endfunction()
 
 if (BUILD_TOOLS)
+  # wasm2c generated code templates
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_header_top.c
+    ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_header_bottom.c
+    ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_source_includes.c
+    ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_source_declarations.c
+
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/src/wasm2c_tmpl.py -o ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_header_top.c ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.top.h s_header_top
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/src/wasm2c_tmpl.py -o ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_header_bottom.c ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.bottom.h s_header_bottom
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/src/wasm2c_tmpl.py -o ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_source_includes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.includes.c s_source_includes
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/src/wasm2c_tmpl.py -o ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_source_declarations.c ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.declarations.c s_source_declarations
+
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.top.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.bottom.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.includes.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/template/wasm2c.declarations.c
+    )
+
+  add_library(cwriter-template
+    ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_header_top.c
+    ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_header_bottom.c
+    ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_source_includes.c
+    ${CMAKE_CURRENT_BINARY_DIR}/wasm2c_source_declarations.c)
+
   # wat2wasm
   wabt_executable(
     NAME wat2wasm
@@ -471,6 +495,7 @@ if (BUILD_TOOLS)
   wabt_executable(
     NAME wasm2c
     SOURCES src/tools/wasm2c.cc src/c-writer.cc
+    LIBS cwriter-template
     INSTALL
   )
 

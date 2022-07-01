@@ -45,23 +45,19 @@ def main(args):
     arg_parser.add_argument('-o', '--output', metavar='PATH',
                             help='output file.')
     arg_parser.add_argument('file', help='input file.')
+    arg_parser.add_argument('section_name', help='section name.')
     options = arg_parser.parse_args(args)
 
-    section_name = None
     output = io.StringIO()
 
     output.write('/* Generated from \'%s\' by wasm2c_tmpl.py, do not edit! */\n' %
                  os.path.basename(options.file))
 
+    output.write('const char %s[] =\n' % options.section_name)
+
     with open(options.file) as f:
         for line in f.readlines():
-            if line.startswith('%%'):
-                if section_name is not None:
-                    output.write(';\n\n')
-                section_name = line[2:-1]
-                output.write('const char SECTION_NAME(%s)[] =\n' % section_name)
-            else:
-                output.write('"%s"\n' % EscapeCString(line))
+            output.write('"%s"\n' % EscapeCString(line))
 
     output.write(';\n')
     if options.output:
