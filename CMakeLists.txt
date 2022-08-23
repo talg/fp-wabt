@@ -1,4 +1,4 @@
-#
+
 # Copyright 2016 WebAssembly Community Group participants
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -360,6 +360,7 @@ set(WABT_LIBRARY_SRC
 )
 
 add_library(wabt STATIC ${WABT_LIBRARY_SRC})
+add_subdirectory("third_party/uvwasi" )
 
 IF (NOT WIN32)
   add_library(wasm-rt-impl STATIC wasm2c/wasm-rt-impl.c wasm2c/wasm-rt-impl.h)
@@ -486,6 +487,7 @@ if (BUILD_TOOLS)
     )
 
   add_library(cwriter-template wasm2c_header_top.cc wasm2c_header_bottom.cc wasm2c_source_includes.cc wasm2c_source_declarations.cc)
+
 
   wabt_executable(
     NAME wasm2c
