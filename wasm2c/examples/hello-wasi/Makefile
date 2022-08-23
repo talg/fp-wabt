@@ -12,18 +12,18 @@ WASM_CFLAGS=-Wl,--export-all -Wl,--no-entry -Wl,--growable-table -Wl,--stack-fir
 WASM2C=$(WABT_ROOT)/bin/wasm2c
 
 WASM2C_RUNTIME_PATH=$(WABT_ROOT)/wasm2c/
-WASI_RUNTIME_FILES=$(addprefix $(WASM2C_RUNTIME_PATH), wasm-rt-impl.c uvwasi-rt.c uvwasi-rt-main.c)
+WASM2C_RUNTIME_FILES=$(addprefix $(WASM2C_RUNTIME_PATH), wasm-rt-impl.c uvwasi-rt.c uvwasi-rt-main.c)
 
 UVWASI_PATH=$(WABT_ROOT)/third_party/uvwasi
 
-DEPS="-I$(UVWASI_PATH)/include -L$(WABT_ROOT)/build/_deps/libuv-build -Lbuild/_deps/uvwasi-build -luvwasi_a -luv_a -lpthread -ldl -lm"
+DEPS=-I$(UVWASI_PATH)/include -L$(WABT_ROOT)/build/_deps/libuv-build -L$(WABT_ROOT)/build/third_party/uvwasi
 
-ALL_RESULTS=hello.wasm hello.wasm.{c,h} #XXX hello.elf
+ALL_RESULTS=hello.wasm hello.wasm.c hello.elf
 
 all: $(ALL_RESULTS)
 
 clean:
-	rm -rf $(ALL_RESULTS) *.o
+	rm -rf $(ALL_RESULTS) hello.wasm.h *.o
 
 hello.wasm: hello.c
 	$(WASI_CLANG) --sysroot $(WASI_SYSROOT) $(WASM_CFLAGS) hello.c -o hello.wasm
@@ -31,5 +31,5 @@ hello.wasm: hello.c
 hello.wasm.c: hello.wasm
 	$(WASM2C) hello.wasm -o hello.wasm.c
 
-#XXXhello.elf:
-#XXX$(CC) $(CFLAGS) 
+hello.elf: hello.wasm.c
+	$(CC) hello.wasm.c -o hello.elf -I$(WASM2C_RUNTIME_PATH) $(WASM2C_RUNTIME_FILES) $(DEPS) -luvwasi_a -luv_a -lpthread -ldl -lm
