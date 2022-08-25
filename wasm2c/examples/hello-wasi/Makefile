@@ -18,9 +18,11 @@ UVWASI_PATH=$(WABT_ROOT)/third_party/uvwasi
 
 DEPS=-I$(UVWASI_PATH)/include -L$(WABT_ROOT)/build/_deps/libuv-build -L$(WABT_ROOT)/build/third_party/uvwasi
 
+LIBS=-luvwasi_a -luv_a -lpthread -ldl -lm
+
 ALL_RESULTS=hello.wasm hello.wasm.c hello.elf
 
-all: $(ALL_RESULTS)
+all: $(ALL_RESULTS) uvwasi-test
 
 clean:
 	rm -rf $(ALL_RESULTS) hello.wasm.h *.o
@@ -32,4 +34,10 @@ hello.wasm.c: hello.wasm
 	$(WASM2C) hello.wasm -o hello.wasm.c
 
 hello.elf: hello.wasm.c uvwasi-rt.c uvwasi-rt-main.c
-	$(CC) -g hello.wasm.c uvwasi-rt.c uvwasi-rt-main.c -o hello.elf -I$(WASM2C_RUNTIME_PATH) $(WASM2C_RUNTIME_FILES) $(DEPS) -luvwasi_a -luv_a -lpthread -ldl -lm
+	$(CC) -g hello.wasm.c uvwasi-rt.c uvwasi-rt-main.c -o hello.elf -I$(WASM2C_RUNTIME_PATH) $(WASM2C_RUNTIME_FILES) $(DEPS) $(LIBS)
+
+uvwasi-test: uvwasi-test.c
+	$(CC) -g uvwasi-test.c -o uvwasi-test $(DEPS) $(LIBS)
+
+
+

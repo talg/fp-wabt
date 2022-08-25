@@ -4,7 +4,7 @@
 #include "uvwasi.h"
 #include "hello.wasm.h"
 
-extern uvwasi_t uvwasi;
+uvwasi_t uvwasi;
 
 Z_hello_instance_t global_instance;
 
@@ -18,6 +18,9 @@ Z_hello_instance_t global_instance;
 
 int main(int argc, const char** argv)
 {
+
+    uvwasi_options_t init_options;
+    /*
     #define ENV_COUNT       7
     #define PREOPENS_COUNT  2
 
@@ -33,18 +36,34 @@ int main(int argc, const char** argv)
     uvwasi_preopen_t preopens[PREOPENS_COUNT];
 
     //No sandboxing is enforced, binary has access to everything user does
+
     preopens[0].mapped_path = "/";
     preopens[0].real_path = "/";
     preopens[1].mapped_path = "./";
     preopens[1].real_path = ".";
-
-    uvwasi_options_t init_options;
 
     init_options.argc = argc;
     init_options.argv = argv;
     init_options.envp = (const char **) env;
     init_options.preopenc = PREOPENS_COUNT;
     init_options.preopens = preopens;
+    */
+
+    init_options.in = 0;
+    init_options.out = 1;
+    init_options.err = 2;
+    init_options.fd_table_size = 3;
+    init_options.argc = 3;
+    init_options.argv = calloc(3, sizeof(char*));
+    init_options.argv[0] = "--foo=bar";
+    init_options.argv[1] = "-baz";
+    init_options.argv[2] = "100";
+    init_options.envp = NULL;
+    init_options.preopenc = 1;
+    init_options.preopens = calloc(1, sizeof(uvwasi_preopen_t));
+    init_options.preopens[0].mapped_path = "/var";
+    init_options.preopens[0].real_path = ".";
+    init_options.allocator = NULL;
 
     wasm_rt_init();
     uvwasi_errno_t ret = uvwasi_init(&uvwasi, &init_options);
