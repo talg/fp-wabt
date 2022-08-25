@@ -12,7 +12,7 @@ WASM_CFLAGS=-Wl,--export-all -Wl,--no-entry -Wl,--growable-table -Wl,--stack-fir
 WASM2C=$(WABT_ROOT)/bin/wasm2c
 
 WASM2C_RUNTIME_PATH=$(WABT_ROOT)/wasm2c/
-WASM2C_RUNTIME_FILES=$(addprefix $(WASM2C_RUNTIME_PATH), wasm-rt-impl.c uvwasi-rt.c uvwasi-rt-main.c)
+WASM2C_RUNTIME_FILES=$(addprefix $(WASM2C_RUNTIME_PATH), wasm-rt-impl.c)
 
 UVWASI_PATH=$(WABT_ROOT)/third_party/uvwasi
 
@@ -31,5 +31,5 @@ hello.wasm: hello.c
 hello.wasm.c: hello.wasm
 	$(WASM2C) hello.wasm -o hello.wasm.c
 
-hello.elf: hello.wasm.c
-	$(CC) hello.wasm.c -o hello.elf -I$(WASM2C_RUNTIME_PATH) $(WASM2C_RUNTIME_FILES) $(DEPS) -luvwasi_a -luv_a -lpthread -ldl -lm
+hello.elf: hello.wasm.c uvwasi-rt.c uvwasi-rt-main.c
+	$(CC) -g hello.wasm.c uvwasi-rt.c uvwasi-rt-main.c -o hello.elf -I$(WASM2C_RUNTIME_PATH) $(WASM2C_RUNTIME_FILES) $(DEPS) -luvwasi_a -luv_a -lpthread -ldl -lm
