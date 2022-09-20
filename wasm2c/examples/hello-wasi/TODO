@@ -1,0 +1,9 @@
+*-add instance pointer to wasi functions
+-add defintion of wasi struct
+uvwasi + pointer to linear memory.
+
+-change memory access to use wasi_struct memory pointer
+-change wasi calls to use wasi_struct wasi_state pointer
+
+-address any XXX lines
+-make sure linear memory accesses are bounded checked
