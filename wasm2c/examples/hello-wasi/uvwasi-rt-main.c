@@ -74,7 +74,7 @@ int main(int argc, const char** argv)
     }
 
     Z_hello_init_module();
-    Z_hello_instantiate(&global_instance, NULL);
+    Z_hello_instantiate(&global_instance,(struct Z_wasi_snapshot_preview1_instance_t *) &uvwasi);
     Z_helloZ__start(&global_instance);
     Z_hello_free(&global_instance);
     uvwasi_destroy(&uvwasi);
