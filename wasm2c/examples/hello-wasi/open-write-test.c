@@ -1,7 +1,11 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-int main() {
+int main(int argc, char * argv[]) {
+    printf("printing args");
+    for (int i = 0; i < argc ; i++) {
+	printf("[%d] %s \n", i, argv[i]);
+    }
     printf("Running simple file I/O test\n");
     char * hello_str = strdup("hello world");
     puts(hello_str);

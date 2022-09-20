@@ -53,12 +53,17 @@ int main(int argc, const char** argv)
     init_options.out = 1;
     init_options.err = 2;
     init_options.fd_table_size = 3;
-    init_options.argc = 3;
-    init_options.argv = calloc(3, sizeof(char*));
-    init_options.argv[0] = "--foo=bar";
-    init_options.argv[1] = "-baz";
-    init_options.argv[2] = "100";
-    init_options.envp = NULL;
+    /* init_options.argc = 3; */
+    /* init_options.argv = calloc(3, sizeof(char*)); */
+    /* init_options.argv[0] = "--foo=bar"; */
+    /* init_options.argv[1] = "-baz"; */
+    /* init_options.argv[2] = "100"; */
+    /* init_options.envp = NULL; */
+    extern const char ** environ;
+    init_options.argc = argc;
+    init_options.argv = argv;
+    init_options.envp = (const char **) environ;
+
     init_options.preopenc = 2;
     init_options.preopens = calloc(2, sizeof(uvwasi_preopen_t));
 
