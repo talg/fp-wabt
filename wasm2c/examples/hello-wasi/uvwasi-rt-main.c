@@ -59,10 +59,16 @@ int main(int argc, const char** argv)
     init_options.argv[1] = "-baz";
     init_options.argv[2] = "100";
     init_options.envp = NULL;
-    init_options.preopenc = 1;
-    init_options.preopens = calloc(1, sizeof(uvwasi_preopen_t));
-    init_options.preopens[0].mapped_path = "/var";
-    init_options.preopens[0].real_path = ".";
+    init_options.preopenc = 2;
+    init_options.preopens = calloc(2, sizeof(uvwasi_preopen_t));
+
+    //no sandboxing enforced, binary has access to everything user does
+    init_options.preopens[0].mapped_path = "/";
+    init_options.preopens[0].real_path = "/";
+    init_options.preopens[1].mapped_path = "./";
+    init_options.preopens[1].real_path = ".";
+
+
     init_options.allocator = NULL;
 
     wasm_rt_init();

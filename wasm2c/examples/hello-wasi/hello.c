@@ -1,6 +1,1 @@
-#include <stdio.h>
-
-int main()
-{
-    printf("hello wasi!\n");
-}
+open-write-test.c

@@ -20,9 +20,9 @@ DEPS=-I$(UVWASI_PATH)/include -L$(WABT_ROOT)/build/_deps/libuv-build -L$(WABT_RO
 
 LIBS=-luvwasi_a -luv_a -lpthread -ldl -lm
 
-ALL_RESULTS=hello.wasm hello.wasm.c hello.elf
+ALL_RESULTS=hello.wasm hello.wasm.c hello.elf uvwasi-test
 
-all: $(ALL_RESULTS) uvwasi-test
+all: $(ALL_RESULTS)
 
 clean:
 	rm -rf $(ALL_RESULTS) hello.wasm.h *.o
