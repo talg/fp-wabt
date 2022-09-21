@@ -2,16 +2,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "uvwasi.h"
-#include "hello.wasm.h"
 #include "uvwasi-rt.h"
 
-/*
 #define MODULE_NAME hello
+#define MODULE_HEADER "hello.wasm.h"
+#include MODULE_HEADER
 
-#define module_init() Z_## MODULE_NAME ##_init_module()
-#define module_instantiate(instance_p, wasi_p)  Z_ ##MODULE_NAME## _instantiate_module(instance_p, wasi_p)
-#define module_free(instance_p) Z_##MODULE_NAME##_free(instance_p)
-*/
+//force pre-processor expansion of m_name
+#define __module_init(m_name) Z_## m_name ##_init_module()
+#define module_init(m_name) __module_init(m_name)
+
+#define __module_instantiate(m_name, instance_p, wasi_p) Z_## m_name ##_instantiate(instance_p, wasi_p)
+#define module_instantiate(m_name ,instance_p, wasi_p) __module_instantiate(m_name ,instance_p, wasi_p)
+
+#define __module_free(m_name, instance_p)  Z_## m_name ##_free(instance_p)
+#define module_free(m_name, instance_p) __module_free(m_name, instance_p)
+
+#define __module_start(m_name, instance_p) Z_ ## m_name ## Z__start(instance_p)
+#define module_start(m_name, instance_p) __module_start(m_name, instance_p)
 
 int main(int argc, const char** argv)
 {
@@ -56,12 +64,12 @@ int main(int argc, const char** argv)
         exit(1);
     }
 
-    Z_hello_init_module();
-    Z_hello_instantiate(&local_instance,(struct Z_wasi_snapshot_preview1_instance_t *) &wasi_state);
-    Z_helloZ__start(&local_instance);
-    Z_hello_free(&local_instance);
-    uvwasi_destroy(&local_uvwasi_state);
+    module_init(MODULE_NAME);
+    module_instantiate(MODULE_NAME, &local_instance, (struct Z_wasi_snapshot_preview1_instance_t *) &wasi_state);
+    module_start(MODULE_NAME, &local_instance);
+    module_free(MODULE_NAME, &local_instance);
 
+    uvwasi_destroy(&local_uvwasi_state);
     wasm_rt_free();
 
     return 0;

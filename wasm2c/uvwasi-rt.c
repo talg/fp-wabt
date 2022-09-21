@@ -5,7 +5,6 @@
 
 #include "wasm-rt.h"
 #include "uvwasi.h"
-#include "hello.wasm.h"
 #include "uvwasi-rt.h"
 
 typedef uint8_t u8;

@@ -1,17 +1,12 @@
 Feature completetion:
 
-Eliminate direct use of global_instance and uvwasi
-    *-add instance pointer to wasi functions
-    -add defintion of wasi struct
-    uvwasi + pointer to linear memory.
-
-    -change memory access to use wasi_struct memory pointer
-    -change wasi calls to use wasi_struct wasi_state pointer
+-divorce runtime from hello example.
+-add stand-alone functionality.
+-write script to make it easy to build normal code with wasi (like wasm2native).
 
 -address any XXX lines
 -make sure linear memory accesses are bounded checked
 
--write script to make it easy to build normal code with wasi (like wasm2native).
 
 Clean up:
 -Relocate files to appropriate locations
