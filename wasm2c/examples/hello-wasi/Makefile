@@ -20,7 +20,7 @@ DEPS=-I$(UVWASI_PATH)/include -L$(WABT_ROOT)/build/_deps/libuv-build -L$(WABT_RO
 
 LIBS=-luvwasi_a -luv_a -lpthread -ldl -lm
 
-ALL_RESULTS=hello.wasm hello.wasm.c hello.elf uvwasi-test
+ALL_RESULTS=hello.wasm hello.wasm.c hello.elf
 
 all: $(ALL_RESULTS)
 
@@ -35,9 +35,3 @@ hello.wasm.c: hello.wasm
 
 hello.elf: hello.wasm.c  uvwasi-rt-main.c $(WASM2C_RUNTIME_FILES)
 	$(CC) -g hello.wasm.c uvwasi-rt-main.c -o hello.elf -I$(WASM2C_RUNTIME_PATH) $(WASM2C_RUNTIME_FILES) $(DEPS) $(LIBS)
-
-uvwasi-test: uvwasi-test.c
-	$(CC) -g uvwasi-test.c -o uvwasi-test $(DEPS) $(LIBS)
-
-
-
