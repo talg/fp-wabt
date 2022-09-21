@@ -11,6 +11,8 @@ Eliminate direct use of global_instance and uvwasi
 -address any XXX lines
 -make sure linear memory accesses are bounded checked
 
+-write script to make it easy to build normal code with wasi (like wasm2native).
+
 Clean up:
 -Relocate files to appropriate locations
 -move onto wabt branch

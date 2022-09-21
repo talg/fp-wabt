@@ -5,7 +5,7 @@
 #include "wasm-rt.h"
 
 struct Z_wasi_snapshot_preview1_instance_t {
-    uvwasi_t uvwasi;
+    uvwasi_t * uvwasi;
     wasm_rt_memory_t * instance_memory;
 };
 

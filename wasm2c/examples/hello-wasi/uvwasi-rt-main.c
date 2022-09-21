@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "uvwasi.h"
 #include "hello.wasm.h"
+#include "uvwasi-rt.h"
 
 uvwasi_t uvwasi;
 
@@ -18,6 +19,13 @@ Z_hello_instance_t global_instance;
 
 int main(int argc, const char** argv)
 {
+    Z_hello_instance_t local_instance;
+    uvwasi_t local_uvwasi_state;
+
+    struct Z_wasi_snapshot_preview1_instance_t wasi_state = {
+	.uvwasi = &local_uvwasi_state,
+	.instance_memory = &local_instance.w2c_memory
+    };
 
     uvwasi_options_t init_options;
 
@@ -53,7 +61,7 @@ int main(int argc, const char** argv)
     }
 
     Z_hello_init_module();
-    Z_hello_instantiate(&global_instance,(struct Z_wasi_snapshot_preview1_instance_t *) &uvwasi);
+    Z_hello_instantiate(&global_instance,(struct Z_wasi_snapshot_preview1_instance_t *) &wasi_state);
     Z_helloZ__start(&global_instance);
     Z_hello_free(&global_instance);
     uvwasi_destroy(&uvwasi);
